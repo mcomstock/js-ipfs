@@ -9,6 +9,7 @@ const DAGNode = dagPB.DAGNode
 const DAGLink = dagPB.DAGLink
 const CID = require('cids')
 const mh = require('multihashes')
+const multicodec = require('multicodec')
 const Unixfs = require('ipfs-unixfs')
 const errCode = require('err-code')
 
@@ -87,19 +88,20 @@ module.exports = function object (self) {
               return cb(err)
             }
 
-            self._ipld.put(node, {
+            self._ipld.put([node], {
               version: 0,
-              hashAlg: 'sha2-256',
-              format: 'dag-pb'
-            }, (err, cid) => {
-              if (err) return cb(err)
+              hashAlg: multicodec.SHA2_256,
+              format: multicodec.DAG_PB
+            }).first().then(
+              (cid) => {
+                if (options.preload !== false) {
+                  self._preload(cid)
+                }
 
-              if (options.preload !== false) {
-                self._preload(cid)
-              }
-
-              cb(null, cid)
-            })
+                cb(null, cid)
+              },
+              (error) => cb(error)
+            )
           })
         }
       ], callback)
@@ -137,21 +139,20 @@ module.exports = function object (self) {
           return callback(err)
         }
 
-        self._ipld.put(node, {
+        self._ipld.put([node], {
           version: 0,
-          hashAlg: 'sha2-256',
-          format: 'dag-pb'
-        }, (err, cid) => {
-          if (err) {
-            return callback(err)
-          }
+          hashAlg: multicodec.SHA2_256,
+          format: multicodec.DAG_PB
+        }).first().then(
+          (cid) => {
+            if (options.preload !== false) {
+              self._preload(cid)
+            }
 
-          if (options.preload !== false) {
-            self._preload(cid)
-          }
-
-          callback(null, cid)
-        })
+            callback(null, cid)
+          },
+          (error) => callback(error)
+        )
       })
     }),
     put: promisify((obj, options, callback) => {
@@ -200,21 +201,20 @@ module.exports = function object (self) {
       }
 
       function next () {
-        self._ipld.put(node, {
+        self._ipld.put([node], {
           version: 0,
-          hashAlg: 'sha2-256',
-          format: 'dag-pb'
-        }, (err, cid) => {
-          if (err) {
-            return callback(err)
-          }
+          hashAlg: multicodec.SHA2_256,
+          format: multicodec.DAG_PB
+        }).first().then(
+          (cid) => {
+            if (options.preload !== false) {
+              self._preload(cid)
+            }
 
-          if (options.preload !== false) {
-            self._preload(cid)
-          }
-
-          callback(null, cid)
-        })
+            callback(null, cid)
+          },
+          (error) => callback(error)
+        )
       }
     }),
 
@@ -248,13 +248,10 @@ module.exports = function object (self) {
         self._preload(cid)
       }
 
-      self._ipld.get(cid, (err, result) => {
-        if (err) {
-          return callback(err)
-        }
-
-        callback(null, result.value)
-      })
+      self._ipld.get([cid]).first().then(
+        (node) => callback(null, node),
+        (error) => callback(error)
+      )
     }),
 
     data: promisify((multihash, options, callback) => {
