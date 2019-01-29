@@ -144,7 +144,7 @@ exports.provide = {
         }).code(500)
       }
 
-      reply({})
+      reply()
     })
   }
 }
@@ -176,7 +176,7 @@ exports.put = {
         }).code(500)
       }
 
-      reply({})
+      reply()
     })
   }
 }
