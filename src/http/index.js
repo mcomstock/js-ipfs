@@ -3,7 +3,8 @@
 const series = require('async/series')
 const Hapi = require('hapi')
 const debug = require('debug')
-const multiaddr = require('multiaddr')
+const toUri = require('multiaddr-to-uri')
+const toMultiaddr = require('uri-to-multiaddr')
 const setHeader = require('hapi-set-header')
 const once = require('once')
 
@@ -15,9 +16,17 @@ const WS = require('libp2p-websockets')
 const Bootstrap = require('libp2p-bootstrap')
 const errorHandler = require('./error-handler')
 
-function uriToMultiaddr (uri) {
-  const ipPort = uri.split('/')[2].split(':')
-  return `/ip4/${ipPort[0]}/tcp/${ipPort[1]}`
+function serverInfoToMultiaddr (info) {
+  let hostname = info.host
+  let uri = info.uri
+  // ipv6 fix
+  if (hostname.includes(':') && !hostname.startsWith('[')) {
+    // hapi 16 produces invalid URI for ipv6
+    // we fix it here by restoring missing square brackets
+    hostname = `[${hostname}]`
+    uri = uri.replace(`://${info.host}`, `://${hostname}`)
+  }
+  return toMultiaddr(uri)
 }
 
 function HttpApi (repo, config, cliArgs) {
@@ -162,13 +171,12 @@ function HttpApi (repo, config, cliArgs) {
       (cb) => {
         const api = this.server.select('API')
         const gateway = this.server.select('Gateway')
-        this.apiMultiaddr = multiaddr('/ip4/127.0.0.1/tcp/' + api.info.port)
-        api.info.ma = uriToMultiaddr(api.info.uri)
-        gateway.info.ma = uriToMultiaddr(gateway.info.uri)
+        api.info.ma = serverInfoToMultiaddr(api.info)
+        gateway.info.ma = serverInfoToMultiaddr(gateway.info)
 
         this.node._print('API listening on %s', api.info.ma)
         this.node._print('Gateway (read only) listening on %s', gateway.info.ma)
-        this.node._print('Web UI available at %s', api.info.uri + '/webui')
+        this.node._print('Web UI available at %s', toUri(api.info.ma) + '/webui')
 
         // for the CLI to know the where abouts of the API
         this.node._repo.apiAddr.set(api.info.ma, cb)
